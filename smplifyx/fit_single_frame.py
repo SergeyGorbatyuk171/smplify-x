@@ -19,8 +19,8 @@ from __future__ import absolute_import
 from __future__ import print_function
 from __future__ import division
 
-
 import time
+
 try:
     import cPickle as pickle
 except ImportError:
@@ -112,10 +112,10 @@ def fit_single_frame(img,
         body_pose_prior_weights = [4.04 * 1e2, 4.04 * 1e2, 57.4, 4.78]
 
     msg = (
-        'Number of Body pose prior weights {}'.format(
-            len(body_pose_prior_weights)) +
-        ' does not match the number of data term weights {}'.format(
-            len(data_weights)))
+            'Number of Body pose prior weights {}'.format(
+                len(body_pose_prior_weights)) +
+            ' does not match the number of data term weights {}'.format(
+                len(data_weights)))
     assert (len(data_weights) ==
             len(body_pose_prior_weights)), msg
 
@@ -139,8 +139,8 @@ def fit_single_frame(img,
            ' number of Shape prior weights = {}')
     assert (len(shape_weights) ==
             len(body_pose_prior_weights)), msg.format(
-                len(shape_weights),
-                len(body_pose_prior_weights))
+        len(shape_weights),
+        len(body_pose_prior_weights))
 
     if use_face:
         if jaw_pose_prior_weights is None:
@@ -160,8 +160,8 @@ def fit_single_frame(img,
                ' number of Expression prior weights = {}')
         assert (len(expr_weights) ==
                 len(body_pose_prior_weights)), msg.format(
-                    len(body_pose_prior_weights),
-                    len(expr_weights))
+            len(body_pose_prior_weights),
+            len(expr_weights))
 
         if face_joints_weights is None:
             face_joints_weights = [0.0, 0.0, 0.0, 1.0]
@@ -415,7 +415,7 @@ def fit_single_frame(img,
 
                 curr_weights['data_weight'] = data_weight
                 curr_weights['bending_prior_weight'] = (
-                    3.17 * curr_weights['body_pose_weight'])
+                        3.17 * curr_weights['body_pose_weight'])
                 if use_hands:
                     joint_weights[:, 25:76] = curr_weights['hand_weight']
                 if use_face:
@@ -466,14 +466,24 @@ def fit_single_frame(img,
             # orientations, if they exist
             result = {'camera_' + str(key): val.detach().cpu().numpy()
                       for key, val in camera.named_parameters()}
+            ###############
+            result.update({'camera_center': camera.center.detach().numpy()})
+            ###############
             result.update({key: val.detach().cpu().numpy()
                            for key, val in body_model.named_parameters()})
+            result['leye_pose'] = np.zeros_like(result['leye_pose'])
+            result['reye_pose'] = np.zeros_like(result['reye_pose'])
             if use_vposer:
                 result['body_pose'] = pose_embedding.detach().cpu().numpy()
 
+            ###############
+            result['body_pose'] = vposer.decode(
+                pose_embedding,
+                output_type='aa').view(1, -1)
+            ###############
+
             results.append({'loss': final_loss_val,
                             'result': result})
-
         with open(result_fn, 'wb') as result_file:
             if len(results) > 1:
                 min_idx = (0 if results[0]['loss'] < results[1]['loss']
@@ -490,10 +500,10 @@ def fit_single_frame(img,
         model_type = kwargs.get('model_type', 'smpl')
         append_wrists = model_type == 'smpl' and use_vposer
         if append_wrists:
-                wrist_pose = torch.zeros([body_pose.shape[0], 6],
-                                         dtype=body_pose.dtype,
-                                         device=body_pose.device)
-                body_pose = torch.cat([body_pose, wrist_pose], dim=1)
+            wrist_pose = torch.zeros([body_pose.shape[0], 6],
+                                     dtype=body_pose.dtype,
+                                     device=body_pose.device)
+            body_pose = torch.cat([body_pose, wrist_pose], dim=1)
 
         model_output = body_model(return_verts=True, body_pose=body_pose)
         vertices = model_output.vertices.detach().cpu().numpy().squeeze()
