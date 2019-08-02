@@ -128,12 +128,12 @@ def parse_config(argv=None):
                         type=int,
                         help='The number of gaussian for the Pose Mixture' +
                         ' Prior.')
-    parser.add_argument('--use_pca', default=True,
+    parser.add_argument('--use_pca', default=False,
                         type=lambda x: x.lower() in ['true', '1'],
                         help='Use the low dimensional PCA space for the hands')
     parser.add_argument('--num_pca_comps', default=6, type=int,
                         help='The number of PCA components for the hand.')
-    parser.add_argument('--flat_hand_mean', default=False,
+    parser.add_argument('--flat_hand_mean', default=True,
                         type=lambda arg: arg.lower() in ['true', '1'],
                         help='Use the flat hand as the mean pose')
     parser.add_argument('--body_prior_type', default='mog', type=str,

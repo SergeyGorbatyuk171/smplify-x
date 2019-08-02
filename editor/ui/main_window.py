@@ -7,7 +7,7 @@ import cv2
 import pickle
 from os.path import join
 # import ConfigParser
-
+import trimesh
 from PyQt5 import QtGui, QtWidgets
 from opendr.camera import ProjectPoints, Rodrigues
 from smplx.body_models import SMPLX
@@ -83,10 +83,10 @@ class Ui_MainWindow(QtWidgets.QMainWindow, Ui_MainWindow_Base):
             alphaMode='BLEND',
             baseColorFactor=(5.0, 5.0, 5.0, 1.0))
         im_size = self.canvas_size if self.canvas_size is not None else (MAX_CANVAS_WIDTH, MAX_CANVAS_HEIGHT)
-        self.camera = PerspectiveCamera(yfov=np.pi/3.0,
-                                        aspectRatio=float(self.canvas_size[0])/self.canvas_size[1])
-        # self.camera = IntrinsicsCamera(fx=5000., fy=5000.,
-        #                                cx=im_size[0]/2, cy=im_size[1]/2)
+        # self.camera = PerspectiveCamera(yfov=np.pi/3.0,
+        #                                 aspectRatio=float(self.canvas_size[0])/self.canvas_size[1])
+        self.camera = IntrinsicsCamera(fx=5000., fy=5000.,
+                                       cx=im_size[0]/2, cy=im_size[1]/2)
         # self.camera = CustomIntrinsicsCamera(fx=5000., fy=5000.,
         #                                cx=im_size[0]/2, cy=im_size[1]/2)
 
@@ -98,17 +98,18 @@ class Ui_MainWindow(QtWidgets.QMainWindow, Ui_MainWindow_Base):
                               'frustum': {'near': self.camera.znear, 'far': self.camera.zfar,
                                           'width': im_size[0], 'height': im_size[1]}}
         camera_pos = np.eye(4)
-        print(self.cam_trans)
-        print(self.camera.get_projection_matrix(im_size[0], im_size[1]))
-        print(self.camera.cx, self.camera.cy)
+        # print(self.cam_trans)
+        # print(self.camera.get_projection_matrix(im_size[0], im_size[1]))
+        # print(self.camera.cx, self.camera.cy)
         camera_pos[:3, :3] = self.cam_rot
-        camera_pos[:3, 3] = self.cam_trans * -1
+        self.cam_trans[0] *= -1
+        camera_pos[:3, 3] = self.cam_trans
         slight = SpotLight(color=[1.0, 1.0, 1.0], intensity=10.0)
         slight_pos = np.eye(4)
         slight_pos[:3, 3] = np.array([0, 0, 5])
         self.scene.add(self.camera, pose=camera_pos)
         self.scene.add(slight, pose=slight_pos)
-        self.renderer = OffscreenRenderer(viewport_width=self.canvas_size[0], viewport_height=self.canvas_size[1], point_size=1.0)
+        self.renderer = OffscreenRenderer(viewport_width=im_size[0], viewport_height=im_size[1], point_size=1.0)
 
         # Rest setup
         self.setupUi(self)
@@ -347,9 +348,15 @@ class Ui_MainWindow(QtWidgets.QMainWindow, Ui_MainWindow_Base):
             if node.name == 'body_mesh':
                 self.scene.remove_node(node)
                 break
-        model_obj = self.model()
-        mesh = Mesh.from_trimesh(Trimesh(model_obj.vertices.detach().numpy().squeeze(), self.model.faces.squeeze()),
-                                 material=self.material)
+        rectified_orient = self.model.global_orient.detach().clone()
+        rectified_orient[0][0] += np.pi
+        model_obj = self.model(global_orient=rectified_orient)
+        out_mesh = Trimesh(model_obj.vertices.detach().numpy().squeeze(), self.model.faces.squeeze())
+        rot = trimesh.transformations.rotation_matrix(
+            np.radians(180), [1, 0, 0])
+        out_mesh.apply_transform(rot)
+        mesh = Mesh.from_trimesh(out_mesh, material=self.material)
+
         self.scene.add(mesh, name='body_mesh')
         rendered, _ = self.renderer.render(self.scene)
 
